@@ -14,7 +14,7 @@ module Elmas
     end
 
     def success?
-      @response.success? || SUCCESS_CODES.include?(status)
+      @response.success?
     end
 
     def body
@@ -38,7 +38,7 @@ module Elmas
     end
 
     def fail?
-      ERROR_CODES.include? status
+      !success?
     end
 
     def error_message
@@ -50,23 +50,29 @@ module Elmas
       Elmas.error(message)
     end
 
-    SUCCESS_CODES = [
-      201, 202, 203, 204, 301, 302, 303, 304
-    ].freeze
-
-    ERROR_CODES = [
-      400, 401, 402, 403, 404, 500, 501, 502, 503
-    ].freeze
-
-    UNAUTHORIZED_CODES = [
-      400, 401, 402, 403
-    ].freeze
-
     private
 
     def raise_and_log_error
       log_error
-      raise BadRequestException.new(@response, parsed)
+
+      case @response.status
+      when 400
+        raise BadRequestException.new(@response, parsed)
+      when 401
+        raise UnauthorizedException.new(@response, parsed)
+      when 403
+        raise ForbiddenException.new(@response, parsed)
+      when 404
+        raise NotFoundException.new(@response, parsed)
+      when 429
+        raise TooManyRequestsException.new(@response, parsed)
+      when 400..499
+        raise ClientException.new(@response, parsed)
+      when 500..599
+        raise ServerException.new(@response, parsed)
+      else
+        raise ApiException.new(@response, parsed)
+      end
     end
   end
 end
